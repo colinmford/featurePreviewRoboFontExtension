@@ -1,20 +1,22 @@
-from vanilla import *
-
 import os
 import tempfile
 
 from compositor import Font as FeatureFont
 from compositor.textUtilities import convertCase
-
-from defconAppKit.windows.baseWindow import BaseWindowController
-from defconAppKit.controls.openTypeControlsView import OpenTypeControlsView
-from defconAppKit.controls.glyphSequenceEditText import GlyphSequenceEditText
 from defconAppKit.controls.glyphLineView import GlyphLineView
-
+from defconAppKit.controls.glyphSequenceEditText import GlyphSequenceEditText
+from defconAppKit.controls.openTypeControlsView import OpenTypeControlsView
+from defconAppKit.windows.baseWindow import BaseWindowController
 from fontCompiler.compiler import FontCompilerOptions
 from fontCompiler.emptyCompiler import EmptyOTFCompiler
 from fontCompiler.tools.compileTools import EmbeddedFDK
+from vanilla import *
 
+try:
+    from feaPyFoFum import compileFeatures
+    hasFeaPyFoFum = True
+except:
+    hasFeaPyFoFum = False
 
 class FeatureTester(BaseWindowController):
 
@@ -114,6 +116,9 @@ class FeatureTester(BaseWindowController):
         if self.font.info.openTypeOS2WinDescent is not None and self.font.info.openTypeOS2WinDescent < 0:
             self.font.info.openTypeOS2WinDescent = abs(self.font.info.openTypeOS2WinDescent)
         self.font.info.postscriptNominalWidthX = None
+        if hasFeaPyFoFum:
+            prevFeaText = self.font.features.text
+            self.font.features.text = compileFeatures(prevFeaText, self.font, compileReferencedFiles=True)
         options = FontCompilerOptions()
         options.outputPath = path
         options.fdk = EmbeddedFDK()
@@ -133,6 +138,7 @@ class FeatureTester(BaseWindowController):
                         report.append(line)
                 self.showMessage("Error while compiling features", "\n".join(report))
 
+        self.font.features.text = prevFeaText
         # stop the progress
         self.glyphLineProgressSpinner.stop()
         # color the update button
