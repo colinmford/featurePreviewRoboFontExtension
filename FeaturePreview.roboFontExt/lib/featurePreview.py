@@ -107,22 +107,41 @@ class FeatureTester(BaseWindowController):
         # reposition the text field
         self.glyphLineInput.setPosSize(self.glyphLineInputPosSizeWithSpinner)
         self.glyphLineInput.getNSTextField().superview().display()
+
         # start the progress
         self.glyphLineProgressSpinner.start()
+
+        # "before" info
+        prevOpenTypeOS2WinDescent = self.font.info.openTypeOS2WinDescent
+        prevPostscriptNominalWidthX = self.font.info.postscriptNominalWidthX
+        prevFeaText = self.font.features.text
+        prevFamilyName = self.font.info.familyName
+        prevStyleName = self.font.info.styleName
+        prevOpenTypeNamePreferredFamilyName =  self.font.info.openTypeNamePreferredFamilyName
+        prevOpenTypeNamePreferredSubfamilyName = self.font.info.openTypeNamePreferredSubfamilyName
+
+        # tweak some values to the font generates
+        if self.font.info.openTypeOS2WinDescent is not None and self.font.info.openTypeOS2WinDescent < 0:
+            self.font.info.openTypeOS2WinDescent = abs(self.font.info.openTypeOS2WinDescent)
+
+        self.font.info.postscriptNominalWidthX = None
+
+        if hasFeaPyFoFum:
+            self.font.features.text = compileFeatures(self.font.features.text, self.font, compileReferencedFiles=True)
+
+        self.font.info.familyName = self.font.info.familyName if self.font.info.familyName else "Untitled"
+        self.font.info.styleName = self.font.info.styleName if self.font.info.styleName else "Untitled"
+        self.font.info.openTypeNamePreferredFamilyName = self.font.info.openTypeNamePreferredFamilyName if self.font.info.openTypeNamePreferredFamilyName else "Untitled"
+        self.font.info.openTypeNamePreferredSubfamilyName = self.font.info.openTypeNamePreferredSubfamilyName if self.font.info.openTypeNamePreferredSubfamilyName else "Untitled"
+
         # compile
         path = tempfile.mkstemp()[1]
         compiler = EmptyOTFCompiler()
-        # clean up
-        if self.font.info.openTypeOS2WinDescent is not None and self.font.info.openTypeOS2WinDescent < 0:
-            self.font.info.openTypeOS2WinDescent = abs(self.font.info.openTypeOS2WinDescent)
-        self.font.info.postscriptNominalWidthX = None
-        if hasFeaPyFoFum:
-            prevFeaText = self.font.features.text
-            self.font.features.text = compileFeatures(prevFeaText, self.font, compileReferencedFiles=True)
         options = FontCompilerOptions()
         options.outputPath = path
         options.fdk = EmbeddedFDK()
         reports = compiler.compile(self.font, options)
+
         # load the compiled font
         if os.path.exists(path) and reports["makeotf"] is not None and "makeotfexe [FATAL]" not in reports["makeotf"]:
             self.featureFont = FeatureFont(path)
@@ -138,9 +157,18 @@ class FeatureTester(BaseWindowController):
                         report.append(line)
                 self.showMessage("Error while compiling features", "\n".join(report))
 
+        # reset tweaked values
+        self.font.info.openTypeOS2WinDescent = prevOpenTypeOS2WinDescent
+        self.font.info.postscriptNominalWidthX = prevPostscriptNominalWidthX
         self.font.features.text = prevFeaText
+        self.font.info.familyName = prevFamilyName
+        self.font.info.styleName = prevStyleName
+        self.font.info.openTypeNamePreferredFamilyName = prevOpenTypeNamePreferredFamilyName
+        self.font.info.openTypeNamePreferredSubfamilyName = prevOpenTypeNamePreferredSubfamilyName
+
         # stop the progress
         self.glyphLineProgressSpinner.stop()
+
         # color the update button
         window = self.w.getNSWindow()
         window.setDefaultButtonCell_(None)
@@ -200,9 +228,6 @@ class FeatureTester(BaseWindowController):
             # process
             glyphRecords = self.featureFont.process(glyphNames, script=script, langSys=language, rightToLeft=rightToLeft, case=case)
             # set the UFO's glyphs into the records
-            for glyphRecord in glyphRecords:
-                print(glyphRecord.glyph, glyphRecord.advanceWidth)
-                
             for glyphRecord in glyphRecords:
                 if glyphRecord.glyphName not in self.font:
                     continue
